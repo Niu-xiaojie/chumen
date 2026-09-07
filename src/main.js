@@ -6,7 +6,7 @@ const defaultState = {
   tab: "today",
   session: {
     locked: "none",
-    heat: "ok",
+    weather: "ok",
     vibe: "nature",
   },
   liked: [],
@@ -20,10 +20,12 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(defaultState);
     const parsed = JSON.parse(raw);
+    const session = { ...defaultState.session, ...parsed.session };
+    if (!session.weather && session.heat) session.weather = session.heat;
     return {
       ...structuredClone(defaultState),
       ...parsed,
-      session: { ...defaultState.session, ...parsed.session },
+      session,
       wishes: parsed.wishes?.length ? parsed.wishes : SEEDED_WISHES,
     };
   } catch {
@@ -37,19 +39,32 @@ function save(state) {
 
 let state = load();
 
+function weatherNow() {
+  return state.session.weather || state.session.heat || "ok";
+}
+
 function score(place, relax) {
-  const { locked, heat, vibe } = state.session;
+  const { locked, vibe } = state.session;
+  const weather = weatherNow();
   let s = 20;
   if (state.disliked.includes(place.id)) return -999;
+  if (place.id === "home" && weather !== "rain" && weather !== "typhoon") return -200;
   if (place.far && !relax.far) return -200;
   if (!relax.concert && (locked === "concert" || locked === "other") && place.far) s -= 80;
-  if (!relax.concert && locked === "concert" && place.id !== "xixiang-river" && place.id !== "imax" && place.id !== "old-street" && place.id !== "yantian") {
+  if (!relax.concert && locked === "concert" && place.id !== "xixiang-river" && place.id !== "imax" && place.id !== "old-street" && place.id !== "yantian" && place.id !== "home") {
     if (!place.far) s -= 8;
     if (["pingluan", "tiegang", "qilong", "tiezai"].includes(place.id)) s -= 70;
   }
-  if (!relax.heat && heat === "hot" && place.overpassBike) s -= 50;
-  if (!relax.heat && heat === "hot" && !place.shade) s -= 12;
-  if (vibe === "nature" && place.vibe !== "nature") s -= 18;
+  if (!relax.weather) {
+    if (weather === "typhoon" && !place.indoor) return -400;
+    if (weather === "rain" && !place.indoor) return -300;
+    if (weather === "haze" && place.vibe === "nature" && !place.indoor) s -= 45;
+    if (weather === "haze" && place.indoor) s += 20;
+    if (weather === "hot" && place.overpassBike) s -= 50;
+    if (weather === "hot" && !place.shade) s -= 12;
+    if (weather === "hot" && place.indoor) s += 8;
+  }
+  if (vibe === "nature" && place.vibe !== "nature" && place.id !== "home" && weather !== "rain" && weather !== "typhoon") s -= 18;
   if (vibe === "city" && place.vibe === "nature") s -= 12;
   if (state.liked.includes(place.id)) s += 16;
   if (place.crowded === "low") s += 4;
@@ -65,14 +80,20 @@ function rank(relax) {
 }
 
 function pick() {
-  let list = rank({ far: false, concert: false, heat: false });
+  const weather = weatherNow();
+  const harsh = weather === "rain" || weather === "typhoon";
+  let list = rank({ far: false, concert: false, weather: false });
   let note = "";
-  if (!list.length) {
-    list = rank({ far: false, concert: true, heat: true });
-    if (list.length) note = "按现在的冷热和安排，近处不够了。下面这些条件松一点。";
+  if (weather === "typhoon") note = "台风天别往外跑。只留室内，或待在家。";
+  if (weather === "rain") note = "下大雨，山、海、河边先放下。只留室内。";
+  if (weather === "haze") note = "雾霾天少爬山看海，偏室内或短走。";
+  if (weather === "hot") note = note || "太热就少爬坡、少推车上桥。";
+  if (!list.length && !harsh) {
+    list = rank({ far: false, concert: true, weather: true });
+    if (list.length) note = "按现在的天气和安排，近处不够了。下面这些条件松一点。";
   }
-  if (!list.length) {
-    list = rank({ far: true, concert: true, heat: true });
+  if (!list.length && !harsh) {
+    list = rank({ far: true, concert: true, weather: true });
     if (list.length) note = "近的你都划掉了。这些更远，还可以看。";
   }
   return {
@@ -99,7 +120,7 @@ function renderToday() {
 
   const list = drained
     ? `<div class="block">
-        <p class="empty" style="margin:0 0 10px">能推的你都划掉了。可以清空「不喜欢」，或改上面的热不热、想去哪类，我再给。</p>
+        <p class="empty" style="margin:0 0 10px">能推的你都划掉了。可以清空「不喜欢」，或改上面的天气、想去哪类，我再给。</p>
         <button class="btn primary" type="button" id="reset-disliked">清空不喜欢，再推荐</button>
       </div>`
     : cards
@@ -134,10 +155,13 @@ function renderToday() {
         </div>
       </div>
       <div class="q">
-        <label>热不热？太热就少推要爬坡、过天桥的。</label>
+        <label>今天天气怎么样？大雨和台风只留室内；雾霾少推爬山看海；太热少爬坡过桥。</label>
         <div class="choices">
-          ${choice("heat", "ok", "还行")}
-          ${choice("heat", "hot", "很热")}
+          ${choice("weather", "ok", "还行")}
+          ${choice("weather", "hot", "很热")}
+          ${choice("weather", "rain", "下大雨")}
+          ${choice("weather", "typhoon", "台风")}
+          ${choice("weather", "haze", "雾霾")}
         </div>
       </div>
       <div class="q">
