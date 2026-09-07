@@ -1,0 +1,16 @@
+{
+  "name": "出门",
+  "short_name": "出门",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fff4d6",
+  "theme_color": "#ff4d2e",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

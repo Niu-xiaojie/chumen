@@ -1,0 +1,260 @@
+:root {
+  --bg: #fff4d6;
+  --bg-2: #ffffff;
+  --card: #ffffff;
+  --ink: #16382f;
+  --muted: #3d6a5e;
+  --line: #ffd48a;
+  --accent: #ff4d2e;
+  --accent-2: #00b3a4;
+  --ok: #0a9f56;
+  --warn: #e85d04;
+  --radius: 18px;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 420px at 10% -10%, #ffe36b 0%, transparent 55%),
+    radial-gradient(900px 380px at 110% 8%, #7ef0d8 0%, transparent 50%),
+    var(--bg);
+  color: var(--ink);
+}
+
+body {
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+
+#app {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+header.app {
+  padding: 20px 20px 8px;
+}
+
+header.app h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+header.app p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+nav.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 12px;
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+  z-index: 2;
+}
+
+nav.tabs button {
+  flex: 1;
+  border: 0;
+  background: var(--bg-2);
+  color: var(--muted);
+  padding: 10px 0;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 0 #ffe08a;
+}
+
+nav.tabs button.on {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 3px 0 #c62811;
+}
+
+main {
+  flex: 1;
+  padding: 0 16px 24px;
+}
+
+.block {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 2px solid var(--line);
+  box-shadow: 0 6px 0 #ffe08a;
+}
+
+.block h2,
+.q label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.q + .q {
+  margin-top: 14px;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choices button,
+.btn {
+  border: 2px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.choices button.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn.primary {
+  width: 100%;
+  margin-top: 4px;
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  color: #08332e;
+  font-weight: 700;
+  padding: 12px;
+}
+
+.btn.ghost {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 2px solid #b7f3e8;
+  box-shadow: 0 6px 0 #7de8d6;
+}
+
+.card .kind {
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.card h3 {
+  margin: 4px 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.card p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.card .how {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.row button {
+  flex: 1;
+}
+
+.mark {
+  font-size: 12px;
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.lock {
+  background: #fff;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+input[type="text"] {
+  width: 100%;
+  border: 2px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+}
+
+.wish-status {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.links a,
+.links button {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 2px solid #ffc3b6;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff;
+  font-weight: 700;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
