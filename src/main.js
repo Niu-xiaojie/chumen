@@ -37,28 +37,49 @@ function save(state) {
 
 let state = load();
 
-function score(place) {
+function score(place, relax) {
   const { locked, heat, vibe } = state.session;
   let s = 20;
   if (state.disliked.includes(place.id)) return -999;
-  if (locked === "concert" && place.id !== "xixiang-river" && place.id !== "imax" && place.id !== "old-street") {
-    if (place.id === "pingluan" || place.id === "tiegang" || place.id === "qilong" || place.id === "tiezai") s -= 80;
+  if (place.far && !relax.far) return -200;
+  if (!relax.concert && (locked === "concert" || locked === "other") && place.far) s -= 80;
+  if (!relax.concert && locked === "concert" && place.id !== "xixiang-river" && place.id !== "imax" && place.id !== "old-street" && place.id !== "yantian") {
+    if (!place.far) s -= 8;
+    if (["pingluan", "tiegang", "qilong", "tiezai"].includes(place.id)) s -= 70;
   }
-  if (heat === "hot" && place.overpassBike) s -= 50;
-  if (heat === "hot" && !place.shade) s -= 12;
+  if (!relax.heat && heat === "hot" && place.overpassBike) s -= 50;
+  if (!relax.heat && heat === "hot" && !place.shade) s -= 12;
   if (vibe === "nature" && place.vibe !== "nature") s -= 18;
   if (vibe === "city" && place.vibe === "nature") s -= 12;
   if (state.liked.includes(place.id)) s += 16;
   if (place.crowded === "low") s += 4;
+  if (place.crowded === "high") s -= 6;
   return s;
 }
 
-function pick() {
+function rank(relax) {
   return [...PLACES]
-    .map((p) => ({ ...p, s: score(p) }))
+    .map((p) => ({ ...p, s: score(p, relax) }))
     .filter((p) => p.s > -50)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 4);
+    .sort((a, b) => b.s - a.s);
+}
+
+function pick() {
+  let list = rank({ far: false, concert: false, heat: false });
+  let note = "";
+  if (!list.length) {
+    list = rank({ far: false, concert: true, heat: true });
+    if (list.length) note = "按现在的冷热和安排，近处不够了。下面这些条件松一点。";
+  }
+  if (!list.length) {
+    list = rank({ far: true, concert: true, heat: true });
+    if (list.length) note = "近的你都划掉了。这些更远，还可以看。";
+  }
+  return {
+    cards: list.slice(0, 4),
+    note,
+    drained: list.length === 0,
+  };
 }
 
 function choice(group, value, label) {
@@ -67,18 +88,45 @@ function choice(group, value, label) {
 }
 
 function renderToday() {
-  const cards = pick();
+  const { cards, note, drained } = pick();
+  const lockedName = PLACES.find((p) => p.id === state.lockedPlace)?.name;
   const lockedNote =
-    state.session.locked === "concert"
-      ? "这周末有演唱会，远的山和湖先放下。只留近的。"
-      : state.lockedPlace
-        ? `已锁：${PLACES.find((p) => p.id === state.lockedPlace)?.name ?? ""}`
+    state.lockedPlace && lockedName
+      ? `这周末就去「${lockedName}」。路怎么走看卡片。不想去了就按「换一个」。`
+      : state.session.locked === "concert"
+        ? "有演唱会就先办这场，下面只留近的，少跑腿。"
         : "";
+
+  const list = drained
+    ? `<div class="block">
+        <p class="empty" style="margin:0 0 10px">能推的你都划掉了。可以清空「不喜欢」，或改上面的热不热、想去哪类，我再给。</p>
+        <button class="btn primary" type="button" id="reset-disliked">清空不喜欢，再推荐</button>
+      </div>`
+    : cards
+        .map((p) => {
+          const liked = state.liked.includes(p.id);
+          const chosen = state.lockedPlace === p.id;
+          return `
+            <article class="card" data-place="${p.id}">
+              <div class="kind">${p.kind}</div>
+              <h3>${p.name}</h3>
+              <p>${p.why}</p>
+              <p class="how">${p.how}</p>
+              ${liked ? `<div class="mark">喜欢</div>` : ""}
+              ${chosen ? `<div class="mark">这周末就去这儿</div>` : ""}
+              <div class="row">
+                <button type="button" data-like="${p.id}">喜欢</button>
+                <button type="button" data-no="${p.id}">不喜欢</button>
+                <button type="button" data-lock="${p.id}">${chosen ? "换一个" : "就去这儿"}</button>
+              </div>
+            </article>`;
+        })
+        .join("");
 
   return `
     <div class="block">
       <div class="q">
-        <label>已经定了什么？</label>
+        <label>今天已经定了什么？定了的会优先，推荐给空档。</label>
         <div class="choices">
           ${choice("locked", "none", "没有")}
           ${choice("locked", "concert", "有演唱会 / 大事")}
@@ -86,7 +134,7 @@ function renderToday() {
         </div>
       </div>
       <div class="q">
-        <label>热不热？</label>
+        <label>热不热？太热就少推要爬坡、过天桥的。</label>
         <div class="choices">
           ${choice("heat", "ok", "还行")}
           ${choice("heat", "hot", "很热")}
@@ -102,31 +150,9 @@ function renderToday() {
       </div>
     </div>
     ${lockedNote ? `<div class="lock">${lockedNote}</div>` : ""}
-    <h2 style="margin:16px 4px 8px;font-size:13px;color:var(--muted);font-weight:500;">给你这几个</h2>
-    ${
-      cards.length
-        ? cards
-            .map((p) => {
-              const liked = state.liked.includes(p.id);
-              const no = state.disliked.includes(p.id);
-              return `
-            <article class="card" data-place="${p.id}">
-              <div class="kind">${p.kind}</div>
-              <h3>${p.name}</h3>
-              <p>${p.why}</p>
-              <p class="how">${p.how}</p>
-              ${liked ? `<div class="mark">喜欢</div>` : ""}
-              ${no ? `<div class="mark warn">不喜欢</div>` : ""}
-              <div class="row">
-                <button type="button" data-like="${p.id}">喜欢</button>
-                <button type="button" data-no="${p.id}">不喜欢</button>
-                <button type="button" data-lock="${p.id}">锁这场</button>
-              </div>
-            </article>`;
-            })
-            .join("")
-        : `<p class="empty">这组条件太窄了。把「很热」或「有演唱会」松开一档再看。</p>`
-    }
+    ${note ? `<div class="lock">${note}</div>` : ""}
+    <h2 style="margin:16px 4px 8px;font-size:13px;color:var(--muted);font-weight:500;">按你的选择，这几个比较合适</h2>
+    ${list}
   `;
 }
 
@@ -224,7 +250,7 @@ function render() {
   app.innerHTML = `
     <header class="app">
       <h1>出门</h1>
-      <p>先看已经定了什么，再给几个能去的。不喊你，不排整周。</p>
+      <p>先勾今天的安排和天气，不喜欢的划掉，剩下的里定一个去处。</p>
     </header>
     <nav class="tabs">
       <button type="button" class="${tab === "today" ? "on" : ""}" data-tab="today">今天</button>
@@ -279,7 +305,15 @@ document.getElementById("app").addEventListener("click", (e) => {
     return;
   }
   if (t.dataset.lock) {
-    state.lockedPlace = t.dataset.lock;
+    const id = t.dataset.lock;
+    state.lockedPlace = state.lockedPlace === id ? null : id;
+    save(state);
+    render();
+    return;
+  }
+  if (t.id === "reset-disliked") {
+    state.disliked = [];
+    state.lockedPlace = null;
     save(state);
     render();
     return;
