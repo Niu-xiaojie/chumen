@@ -38,6 +38,79 @@ function save(state) {
 }
 
 let state = load();
+state.weatherLive = { status: "idle", text: "" };
+state.weatherManual = false;
+
+const XIXIANG = { lat: 22.582, lon: 113.876 };
+
+function weatherCodeText(code) {
+  if (code === 0 || code === 1) return "晴";
+  if (code === 2 || code === 3) return "多云";
+  if (code === 45 || code === 48) return "有雾";
+  if (code >= 51 && code <= 57) return "毛毛雨";
+  if (code === 61 || code === 80) return "小雨";
+  if (code === 63 || code === 81) return "中雨";
+  if (code === 65 || code === 82) return "大雨";
+  if (code >= 66 && code <= 67) return "冻雨";
+  if (code >= 71 && code <= 77) return "雪";
+  if (code >= 95) return "雷雨";
+  return "天气有变化";
+}
+
+function mapObservedWeather({ temp, precip, code, windKmh, pm25 }) {
+  if (windKmh >= 62) return "typhoon";
+  if (
+    precip >= 0.2 ||
+    (code >= 51 && code <= 67) ||
+    (code >= 80 && code <= 82) ||
+    code >= 95
+  ) {
+    return "rain";
+  }
+  if (pm25 >= 75) return "haze";
+  if (temp >= 33) return "hot";
+  return "ok";
+}
+
+async function fetchWeather() {
+  state.weatherLive = { status: "loading", text: "正在查西乡附近的天气…" };
+  render();
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${XIXIANG.lat}&longitude=${XIXIANG.lon}&current=temperature_2m,precipitation,weather_code,wind_speed_10m&wind_speed_unit=kmh&timezone=Asia%2FShanghai`;
+  const airUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${XIXIANG.lat}&longitude=${XIXIANG.lon}&current=pm2_5&timezone=Asia%2FShanghai`;
+  try {
+    const [weatherRes, airRes] = await Promise.all([fetch(weatherUrl), fetch(airUrl)]);
+    if (!weatherRes.ok) throw new Error("weather");
+    const weatherJson = await weatherRes.json();
+    const airJson = airRes.ok ? await airRes.json() : { current: {} };
+    const cur = weatherJson.current || {};
+    const temp = cur.temperature_2m;
+    const precip = cur.precipitation ?? 0;
+    const code = cur.weather_code;
+    const windKmh = cur.wind_speed_10m ?? 0;
+    const pm25 = airJson.current?.pm2_5;
+    const mapped = mapObservedWeather({ temp, precip, code, windKmh, pm25 });
+    const bits = [
+      `${Math.round(temp)}°C`,
+      weatherCodeText(code),
+      windKmh >= 40 ? `风 ${Math.round(windKmh)} km/h` : "",
+      pm25 != null ? `PM2.5 ${Math.round(pm25)}` : "",
+    ].filter(Boolean);
+    if (!state.weatherManual) state.session.weather = mapped;
+    state.weatherLive = {
+      status: "ok",
+      text: `西乡附近现在：${bits.join(" · ")}`,
+      mapped,
+    };
+    save(state);
+    render();
+  } catch {
+    state.weatherLive = {
+      status: "fail",
+      text: "天气没查到。可能是网络或国内访问接口不稳，下面可以手选。",
+    };
+    render();
+  }
+}
 
 function weatherNow() {
   return state.session.weather || state.session.heat || "ok";
@@ -155,7 +228,8 @@ function renderToday() {
         </div>
       </div>
       <div class="q">
-        <label>今天天气怎么样？大雨和台风只留室内；雾霾少推爬山看海；太热少爬坡过桥。</label>
+        <label>今天天气怎么样？打开页面会按西乡查一遍，和实际不符再点下面改。</label>
+        <p class="empty" style="margin:0 0 10px">${state.weatherLive?.text || "还没查天气。"}</p>
         <div class="choices">
           ${choice("weather", "ok", "还行")}
           ${choice("weather", "hot", "很热")}
@@ -163,6 +237,7 @@ function renderToday() {
           ${choice("weather", "typhoon", "台风")}
           ${choice("weather", "haze", "雾霾")}
         </div>
+        <button class="btn ghost" type="button" id="refresh-weather">再查一次西乡天气</button>
       </div>
       <div class="q">
         <label>更想哪类？</label>
@@ -306,9 +381,15 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (t.dataset.set) {
     const [k, v] = t.dataset.set.split(":");
     state.session[k] = v;
+    if (k === "weather") state.weatherManual = true;
     if (v === "concert") state.lockedPlace = null;
     save(state);
     render();
+    return;
+  }
+  if (t.id === "refresh-weather") {
+    state.weatherManual = false;
+    fetchWeather();
     return;
   }
   if (t.dataset.like) {
@@ -389,3 +470,4 @@ document.getElementById("app").addEventListener("click", (e) => {
 });
 
 render();
+fetchWeather();
