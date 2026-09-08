@@ -75,6 +75,16 @@ function mapObservedWeather({ temp, precip, code, windKmh, pm25 }) {
 async function fetchWeather() {
   state.weatherLive = { status: "loading", text: "正在查西乡附近的天气…" };
   render();
+  try {
+    const viaHost = await fetch("/api/weather");
+    if (viaHost.ok) {
+      const payload = await viaHost.json();
+      applyWeather(payload.mapped, payload.text);
+      return;
+    }
+  } catch {
+    /* 静态托管没有这个接口，再试直连 */
+  }
   const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${XIXIANG.lat}&longitude=${XIXIANG.lon}&current=temperature_2m,precipitation,weather_code,wind_speed_10m&wind_speed_unit=kmh&timezone=Asia%2FShanghai`;
   const airUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${XIXIANG.lat}&longitude=${XIXIANG.lon}&current=pm2_5&timezone=Asia%2FShanghai`;
   try {
@@ -95,21 +105,21 @@ async function fetchWeather() {
       windKmh >= 40 ? `风 ${Math.round(windKmh)} km/h` : "",
       pm25 != null ? `PM2.5 ${Math.round(pm25)}` : "",
     ].filter(Boolean);
-    if (!state.weatherManual) state.session.weather = mapped;
-    state.weatherLive = {
-      status: "ok",
-      text: `西乡附近现在：${bits.join(" · ")}`,
-      mapped,
-    };
-    save(state);
-    render();
+    applyWeather(mapped, `西乡附近现在：${bits.join(" · ")}`);
   } catch {
     state.weatherLive = {
       status: "fail",
-      text: "天气没查到。可能是网络或国内访问接口不稳，下面可以手选。",
+      text: "天气没查到。现在这个网址在国内常常打不开国外接口，手选也可以。要日常用，把页面放到 Oracle 那台能直连的机器上。",
     };
     render();
   }
+}
+
+function applyWeather(mapped, text) {
+  if (!state.weatherManual) state.session.weather = mapped;
+  state.weatherLive = { status: "ok", text, mapped };
+  save(state);
+  render();
 }
 
 function weatherNow() {
